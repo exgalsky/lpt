@@ -1,5 +1,5 @@
 import jax
-import lpt4py as lpt
+import lpt
 from mpi4py import MPI
 import argparse
 import sys
