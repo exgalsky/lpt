@@ -1,10 +1,10 @@
 from setuptools import setup
-pname='lpt4py'
+pname='lpt'
 setup(name=pname,
       version='0.1',
-      description='Initial conditions and Lagrangian perturbation theory in Python with mpi4py',
-      url='http://github.com/marcelo-alvarez/lpt4py',
-      author='Marcelo Alvarez',
+      description='Massively parallel GPU-enabled Lagrangian perturbation theory in Python using [jax.]numpy',
+      url='http://github.com/exgalsky/lpt',
+      author='exgalsky collaboration',
       license_files = ('LICENSE',),
       packages=[pname],
       zip_safe=False)
