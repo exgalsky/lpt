@@ -48,11 +48,7 @@ class Cube:
         if slab_axis: return (k_i[self.start:self.end]).astype(jnp.float32)
         return k_i
     
-    def k_square(self):
-        kx = self.k_axis()
-        ky = self.k_axis(slab_axis=True)
-        kz = self.k_axis()[0:self.N // 2 + 1]
-
+    def k_square(self, kx, ky, kz):
         kxa,kya,kza = jnp.meshgrid(kx,ky,kz,indexing='ij')
         del kx, ky, kz ; gc.collect()
 
@@ -61,8 +57,14 @@ class Cube:
 
         return k2
     
-    def interp2FFTgrid(self, k_1d, f_1d):
-        interp_fcn = jnp.sqrt(self.k_square()).ravel()
+    def interp2kgrid(self, k_1d, f_1d):
+        kx = self.k_axis()
+        ky = self.k_axis(slab_axis=True)
+        kz = self.k_axis()[0:self.N // 2 + 1]
+
+        interp_fcn = jnp.sqrt(self.k_square(kx, ky, kz)).ravel()
+        del kx, ky, kz ; gc.collect()
+
         interp_fcn = jnp.interp(interp_fcn, k_1d, f_1d, left='extrapolate', right='extrapolate')
         return jnp.reshape(interp_fcn, self.cshape_local).astype(jnp.float32)
 
@@ -86,7 +88,7 @@ class Cube:
     def _apply_grid_transfer_function(self, field):
         
         ks, transfer_data = tf.fetch_transfer()
-        transfer_cdm = self.interp2FFTgrid(ks, transfer_data)
+        transfer_cdm = self.interp2kgrid(ks, transfer_data)
         del ks, transfer_data ; gc.collect()
 
         return field*transfer_cdm
@@ -161,10 +163,8 @@ class Cube:
         ky = self.k_axis(slab_axis=True)
         kz = self.k_axis()
 
-        kxa,kya,kza = jnp.meshgrid(kx,ky,kz,indexing='ij')
-
-        k2 = (kxa**2+kya**2+kza**2).astype(jnp.float32)
-        del kxa, kya, kza ; gc.collect()
+        k2 = self.k_square(kx, ky, kz)
+        
         kx = kx.at[self.N//2].set(0.0)
         kz = kz.at[-1].set(0.0)
 
