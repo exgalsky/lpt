@@ -8,8 +8,6 @@ import scaleran as sr
 import jax.numpy as jnp 
 import jax.random as rnd
 
-from . import camb_transfer_placeholder as tf
-
 class Cube:
     '''Cube'''
     def __init__(self, **kwargs):
@@ -85,11 +83,9 @@ class Cube:
         noise = jnp.reshape(noise,(N,N,N))
         return jnp.transpose(noise,(1,0,2))
 
-    def _apply_grid_transfer_function(self, field):
-        
-        ks, transfer_data = tf.fetch_transfer()
-        transfer_cdm = self.interp2kgrid(ks, transfer_data)
-        del ks, transfer_data ; gc.collect()
+    def _apply_grid_transfer_function(self, field, transfer_data):
+        transfer_cdm = self.interp2kgrid(transfer_data[:,0], transfer_data[:,1])
+        del transfer_data ; gc.collect()
 
         return field*transfer_cdm
 
@@ -152,9 +148,15 @@ class Cube:
             noise = self._generate_sharded_noise(N, noisetype, seed, nsub)
         return noise
 
-    def noise2delta(self,delta):
+    def noise2delta(self,delta, transfer):
+        if not isinstance(transfer, jnp.ndarray):
+            transfer = transfer()
+        
+        if transfer.ndim != 2 : print('ERROR: Transfer function ndarray is not two dimensional')
+        if transfer.shape[1] != 2: print('ERROR: Transfer function ndarray is a two column array. More than two columns supplied.')
+
         return self._fft(
-                    self._apply_grid_transfer_function(self._fft(delta)),
+                    self._apply_grid_transfer_function(self._fft(delta), transfer),
                     direction='c2r')
 
     def slpt(self, infield='noise', delta=None, mode='lean'):

@@ -27,7 +27,9 @@ kh = trans.transfer_data[0,:,0]
 #transfer functions for different variables, e.g. CDM density and the Weyl potential
 #CDM perturbations have grown, Weyl is O(1) of primordial value on large scales
 delta = trans.transfer_data[camb.model.Transfer_cdm-1,:,0]
+transfer_data = jnp.asarray([kh, delta]).T
+
 
 
 def fetch_transfer():
-    return jnp.asarray(kh, dtype=jnp.float32), jnp.asarray(delta * kh**2., dtype=jnp.float32)
+    return transfer_data.astype(jnp.float32)

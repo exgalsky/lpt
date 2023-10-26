@@ -5,6 +5,8 @@ import argparse
 import sys
 from time import time
 
+import camb_transfer_placeholder as tf
+
 jax.config.update("jax_enable_x64", True)
 
 def myprint(*args,**kwargs):
@@ -65,7 +67,8 @@ delta = cube.generate_noise(seed=seed)
 times = _profiletime(None, 'noise generation', times, comm, mpiproc)
 
 #### NOISE CONVOLUTION TO OBTAIN DELTA
-delta = cube.noise2delta(delta)
+# transfer = tf.fetch_transfer()
+delta = cube.noise2delta(delta, tf.fetch_transfer)
 times = _profiletime(None, 'noise convolution', times, comm, mpiproc)
 
 # #### 2LPT DISPLACEMENTS FROM EXTERNAL (WEBSKY AT 768^3) DENSITY CONTRAST
