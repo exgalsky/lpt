@@ -16,6 +16,8 @@ class Cube:
         self.Lbox    = kwargs.get('Lbox',7700.0)
         self.partype = kwargs.get('partype','jaxshard')
 
+        self.k0 = 2*jnp.pi/self.Lbox*self.N
+
         self.s1lpt = None
         self.s2lpt = None
 
@@ -27,6 +29,10 @@ class Cube:
         self.start = 0
         self.end   = self.N
 
+        # needed for running on CPU with a signle process
+        self.ngpus   = 1        
+        self.host_id = 0
+
         if self.partype == 'jaxshard':
             self.ngpus   = int(os.environ.get("XGSMENV_NGPUS"))
             self.host_id = jax.process_index()
@@ -34,6 +40,34 @@ class Cube:
             self.end     = (self.host_id + 1) * self.N // self.ngpus
             self.rshape_local = (self.N, self.N // self.ngpus, self.N)
             self.cshape_local = (self.N, self.N // self.ngpus, self.N // 2 + 1)
+
+    def k_axis(self, r=False, slab_axis=False):
+        if r: 
+            k_i = (jnp.fft.rfftfreq(self.N) * self.k0).astype(jnp.float32)
+        else:
+            k_i = (jnp.fft.fftfreq(self.N) * self.k0).astype(jnp.float32)
+        if slab_axis: return (k_i[self.start:self.end]).astype(jnp.float32)
+        return k_i
+    
+    def k_square(self, kx, ky, kz):
+        kxa,kya,kza = jnp.meshgrid(kx,ky,kz,indexing='ij')
+        del kx, ky, kz ; gc.collect()
+
+        k2 = (kxa**2+kya**2+kza**2).astype(jnp.float32)
+        del kxa, kya, kza ; gc.collect()
+
+        return k2
+    
+    def interp2kgrid(self, k_1d, f_1d):
+        kx = self.k_axis()
+        ky = self.k_axis(slab_axis=True)
+        kz = self.k_axis(r=True)
+
+        interp_fcn = jnp.sqrt(self.k_square(kx, ky, kz)).ravel()
+        del kx, ky, kz ; gc.collect()
+
+        interp_fcn = jnp.interp(interp_fcn, k_1d, f_1d, left='extrapolate', right='extrapolate')
+        return jnp.reshape(interp_fcn, self.cshape_local).astype(jnp.float32)
 
     def _generate_sharded_noise(self, N, noisetype, seed, nsub):           
         ngpus   = self.ngpus
@@ -52,9 +86,11 @@ class Cube:
         noise = jnp.reshape(noise,(N,N,N))
         return jnp.transpose(noise,(1,0,2))
 
-    def _apply_grid_transfer_function(self,field):
-        # currently identity transfer function as a placeholder
-        return field*(jnp.zeros(self.cshape_local)+1.0).astype(jnp.float32)
+    def _apply_grid_transfer_function(self, field, transfer_data):
+        transfer_cdm = self.interp2kgrid(transfer_data[:,0], transfer_data[:,1])
+        del transfer_data ; gc.collect()
+
+        return field*transfer_cdm
 
     def _fft(self,x_np,direction='r2c'):
         
@@ -115,23 +151,25 @@ class Cube:
             noise = self._generate_sharded_noise(N, noisetype, seed, nsub)
         return noise
 
-    def noise2delta(self,delta):
+    def noise2delta(self, delta, transfer):
+        if not isinstance(transfer, jnp.ndarray):
+            transfer = transfer()
+        
+        if transfer.ndim != 2 : print('ERROR: Transfer function ndarray is not two dimensional')
+        if transfer.shape[1] != 2: print('ERROR: Transfer function ndarray is a two column array. More than two columns supplied.')
+
         return self._fft(
-                    self._apply_grid_transfer_function(self._fft(delta)),
+                    self._apply_grid_transfer_function(self._fft(delta), transfer),
                     direction='c2r')
 
     def slpt(self, infield='noise', delta=None, mode='lean'):
 
-        k0 = 2*jnp.pi/self.Lbox*self.N
-        kx = (jnp.fft.fftfreq(self.N) * k0).astype(jnp.float32)
-        ky = (jnp.fft.fftfreq(self.N) * k0).astype(jnp.float32)
-        ky = (ky[self.start:self.end]).astype(jnp.float32)
-        kz = (jnp.fft.rfftfreq(self.N) * k0).astype(jnp.float32)
+        kx = self.k_axis()
+        ky = self.k_axis(slab_axis=True)
+        kz = self.k_axis(r=True)
 
-        kxa,kya,kza = jnp.meshgrid(kx,ky,kz,indexing='ij')
-
-        k2 = (kxa**2+kya**2+kza**2).astype(jnp.float32)
-        del kxa, kya, kza ; gc.collect()
+        k2 = self.k_square(kx, ky, kz)
+        
         kx = kx.at[self.N//2].set(0.0)
         kz = kz.at[-1].set(0.0)
 
