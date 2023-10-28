@@ -41,8 +41,11 @@ class Cube:
             self.rshape_local = (self.N, self.N // self.ngpus, self.N)
             self.cshape_local = (self.N, self.N // self.ngpus, self.N // 2 + 1)
 
-    def k_axis(self, slab_axis=False):
-        k_i = (jnp.fft.fftfreq(self.N) * self.k0).astype(jnp.float32)
+    def k_axis(self, r=False, slab_axis=False):
+        if r: 
+            k_i = (jnp.fft.rfftfreq(self.N) * self.k0).astype(jnp.float32)
+        else:
+            k_i = (jnp.fft.fftfreq(self.N) * self.k0).astype(jnp.float32)
         if slab_axis: return (k_i[self.start:self.end]).astype(jnp.float32)
         return k_i
     
@@ -58,7 +61,7 @@ class Cube:
     def interp2kgrid(self, k_1d, f_1d):
         kx = self.k_axis()
         ky = self.k_axis(slab_axis=True)
-        kz = self.k_axis()[0:self.N // 2 + 1]
+        kz = self.k_axis(r=True)
 
         interp_fcn = jnp.sqrt(self.k_square(kx, ky, kz)).ravel()
         del kx, ky, kz ; gc.collect()
@@ -163,7 +166,7 @@ class Cube:
 
         kx = self.k_axis()
         ky = self.k_axis(slab_axis=True)
-        kz = self.k_axis()
+        kz = self.k_axis(r=True)
 
         k2 = self.k_square(kx, ky, kz)
         

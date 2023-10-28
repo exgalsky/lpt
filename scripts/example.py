@@ -72,8 +72,8 @@ delta = cube.noise2delta(delta, tf.fetch_transfer)
 times = _profiletime(None, 'noise convolution', times, comm, mpiproc)
 
 # #### 2LPT DISPLACEMENTS FROM EXTERNAL (WEBSKY AT 768^3) DENSITY CONTRAST
-# cube.slpt(infield=ityp,delta=delta)
-# times = _profiletime(None, '2LPT', times, comm, mpiproc)
+cube.slpt(infield=ityp,delta=delta)
+times = _profiletime(None, '2LPT', times, comm, mpiproc)
 
 # LPT displacements are now in
 #   cube.s1x
