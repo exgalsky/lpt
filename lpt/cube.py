@@ -151,7 +151,7 @@ class Cube:
             noise = self._generate_sharded_noise(N, noisetype, seed, nsub)
         return noise
 
-    def noise2delta(self,delta, transfer):
+    def noise2delta(self, delta, transfer):
         if not isinstance(transfer, jnp.ndarray):
             transfer = transfer()
         

@@ -4,10 +4,15 @@ from mpi4py import MPI
 import argparse
 import sys
 from time import time
-
-import camb_transfer_placeholder as tf
+import numpy as np
+import jax.numpy as jnp
 
 jax.config.update("jax_enable_x64", True)
+
+def _test_transfer():
+    k  = np.logspace(-3,2,1000)
+    pk = np.sqrt(1e5 * (k/1e-2) * ((1+(k/1e-2)**2)/2)**-4) # something reasonable for testing purposes
+    return jnp.asarray([k,pk]).T
 
 def myprint(*args,**kwargs):
     print("".join(map(str,args)),**kwargs);  sys.stdout.flush()
@@ -67,11 +72,10 @@ delta = cube.generate_noise(seed=seed)
 times = _profiletime(None, 'noise generation', times, comm, mpiproc)
 
 #### NOISE CONVOLUTION TO OBTAIN DELTA
-# transfer = tf.fetch_transfer()
-delta = cube.noise2delta(delta, tf.fetch_transfer)
+delta = cube.noise2delta(delta, _test_transfer())
 times = _profiletime(None, 'noise convolution', times, comm, mpiproc)
 
-# #### 2LPT DISPLACEMENTS FROM EXTERNAL (WEBSKY AT 768^3) DENSITY CONTRAST
+# 2LPT DISPLACEMENTS USING INPUT DELTA ENCODED IN STRING ityp
 cube.slpt(infield=ityp,delta=delta)
 times = _profiletime(None, '2LPT', times, comm, mpiproc)
 
