@@ -16,7 +16,7 @@ class Cube:
         self.Lbox    = kwargs.get('Lbox',7700.0)
         self.partype = kwargs.get('partype','jaxshard')
 
-        self.k0 = 2*jnp.pi/self.Lbox*self.N
+        self.k0 = 2*jnp.pi/self.Lbox
 
         self.s1lpt = None
         self.s2lpt = None
