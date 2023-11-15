@@ -67,7 +67,7 @@ RNG_manager = mu.RNG_manager()
 IC_rand_stream = RNG_manager.setup_stream('ic_grid')
 
 if not parallel:
-    cube = lpt.Cube(IC_rand_stream, N=N,partype=None)  
+    cube = lpt.Cube(IC_rand_stream.generate, N=N,partype=None)  
 else:
     jax.distributed.initialize()
     cube = lpt.Cube(IC_rand_stream, N=N)

@@ -8,12 +8,12 @@ import jax.numpy as jnp
 
 class Cube:
     '''Cube'''
-    def __init__(self, stream, **kwargs):
+    def __init__(self, stream_method, **kwargs):
 
-        self.stream  = stream
-        self.N       = kwargs.get('N',512)
-        self.Lbox    = kwargs.get('Lbox',7700.0)
-        self.partype = kwargs.get('partype','jaxshard')
+        self.stream_method  = stream_method
+        self.N              = kwargs.get('N',512)
+        self.Lbox           = kwargs.get('Lbox',7700.0)
+        self.partype        = kwargs.get('partype','jaxshard')
 
         self.k0 = 2*jnp.pi/self.Lbox
 
@@ -74,13 +74,13 @@ class Cube:
         start   = self.start
         end     = self.end
 
-        noise = self.stream.generate(start=start*N**2,size=(end-start)*N**2, mc=mc, dist=noisetype, dtype=jnp.float32)
+        noise = self.stream_method(start=start*N**2,size=(end-start)*N**2, mc=mc, dist=noisetype, dtype=jnp.float32)
         noise = jnp.reshape(noise,(end-start,N,N))
         return jnp.transpose(noise,(1,0,2)) 
 
     def _generate_serial_noise(self, N, noisetype, mc):
         
-        noise = self.stream.generate(start=0,size=N**3, mc=mc, dist=noisetype, dtype=jnp.float32)
+        noise = self.stream_method(start=0,size=N**3, mc=mc, dist=noisetype, dtype=jnp.float32)
         noise = jnp.reshape(noise,(N,N,N))
         return jnp.transpose(noise,(1,0,2))
 
