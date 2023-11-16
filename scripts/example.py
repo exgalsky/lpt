@@ -64,7 +64,7 @@ task_tag = "MPI process "+str(mpiproc)
 if MPI.COMM_WORLD.Get_size() > 1: parallel = True
 
 RNG_manager = mu.RNG_manager()
-IC_rand_stream = RNG_manager.setup_stream('ic_grid')
+IC_rand_stream = RNG_manager.setup_stream('ic_grid', dtype=jnp.float32)
 
 if not parallel:
     cube = lpt.Cube(IC_rand_stream.generate, N=N,partype=None)  
