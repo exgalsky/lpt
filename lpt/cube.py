@@ -8,9 +8,9 @@ import jax.numpy as jnp
 
 class Cube:
     '''Cube'''
-    def __init__(self, stream_method, **kwargs):
+    def __init__(self, stream, **kwargs):
 
-        self.stream_method  = stream_method
+        self.stream         = stream
         self.N              = kwargs.get('N',512)
         self.Lbox           = kwargs.get('Lbox',7700.0)
         self.partype        = kwargs.get('partype','jaxshard')
@@ -74,7 +74,7 @@ class Cube:
         start   = self.start
         end     = self.end
 
-        noise = self.stream_method(start=start*N**2,size=(end-start)*N**2, mc=mc, dist=noisetype, dtype=jnp.float32)
+        noise = self.stream.generate(start=start*N**2,size=(end-start)*N**2, mc=mc, dist=noisetype, dtype=jnp.float32)
         noise = jnp.reshape(noise,(end-start,N,N))
         return jnp.transpose(noise,(1,0,2)) 
 
