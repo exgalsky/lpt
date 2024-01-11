@@ -61,7 +61,10 @@ mpiproc  = MPI.COMM_WORLD.Get_rank()
 comm     = MPI.COMM_WORLD
 task_tag = "MPI process "+str(mpiproc)
 
-if MPI.COMM_WORLD.Get_size() > 1: parallel = True
+if MPI.COMM_WORLD.Get_size() > 1: 
+    parallel = True
+    jax.distributed.initialize()
+    print(f'Global mumber of devices {jax.device_count()}')
 
 RNG_manager = mu.RNG_manager()
 IC_rand_stream = RNG_manager.setup_stream('ic_grid', dtype=jnp.float32)
@@ -69,8 +72,6 @@ IC_rand_stream = RNG_manager.setup_stream('ic_grid', dtype=jnp.float32)
 if not parallel:
     cube = lpt.Cube(IC_rand_stream, N=N,partype=None)  
 else:
-    jax.distributed.initialize()
-    print(f'Global mumber of devices {jax.device_count()}')
     cube = lpt.Cube(IC_rand_stream, N=N)
 times = _profiletime(None, 'initialization', times, comm, mpiproc)
 
