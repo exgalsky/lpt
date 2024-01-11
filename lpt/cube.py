@@ -74,13 +74,13 @@ class Cube:
         start   = self.start
         end     = self.end
 
-        noise = self.stream.generate(start=start*N**2,size=(end-start)*N**2, mc=mc, dist=noisetype, dtype=jnp.float32)
+        noise = self.stream.generate(start=start*N**2,size=(end-start)*N**2, mc=mc, dist=noisetype)
         noise = jnp.reshape(noise,(end-start,N,N))
         return jnp.transpose(noise,(1,0,2)) 
 
     def _generate_serial_noise(self, N, noisetype, mc):
         
-        noise = self.stream_method(start=0,size=N**3, mc=mc, dist=noisetype, dtype=jnp.float32)
+        noise = self.stream.generate(start=0,size=N**3, mc=mc, dist=noisetype)
         noise = jnp.reshape(noise,(N,N,N))
         return jnp.transpose(noise,(1,0,2))
 
