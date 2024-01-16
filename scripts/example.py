@@ -1,6 +1,7 @@
 import jax
 import lpt
 from mpi4py import MPI
+import xgmutil as mu
 import argparse
 import sys
 from time import time
@@ -45,12 +46,14 @@ parser = argparse.ArgumentParser(description='Commandline interface to lpt4py ex
 parser.add_argument('--N',     type=int, help='grid dimention [default = 512]', default=512)
 parser.add_argument('--seed',  type=int, help='random seed [default = 13579]',  default=13579)
 parser.add_argument('--ityp',  type=str, help='lpt input type [default = delta]',  default='delta')
+parser.add_argument('--mc',     type=int, help='MC realization no. [default = 0]', default=0)
 
 args = parser.parse_args()
 
 N    = args.N
 seed = args.seed
 ityp = args.ityp
+mc   = args.mc
 
 parallel = False
 nproc    = MPI.COMM_WORLD.Get_size()
@@ -58,17 +61,22 @@ mpiproc  = MPI.COMM_WORLD.Get_rank()
 comm     = MPI.COMM_WORLD
 task_tag = "MPI process "+str(mpiproc)
 
-if MPI.COMM_WORLD.Get_size() > 1: parallel = True
+if MPI.COMM_WORLD.Get_size() > 1: 
+    parallel = True
+    jax.distributed.initialize()
+    print(f'Global mumber of devices {jax.device_count()}')
+
+RNG_manager = mu.RNG_manager()
+IC_rand_stream = RNG_manager.setup_stream('ic_grid', dtype=jnp.float32)
 
 if not parallel:
-    cube = lpt.Cube(N=N,partype=None)  
+    cube = lpt.Cube(IC_rand_stream, N=N,partype=None)  
 else:
-    jax.distributed.initialize()
-    cube = lpt.Cube(N=N)
+    cube = lpt.Cube(IC_rand_stream, N=N)
 times = _profiletime(None, 'initialization', times, comm, mpiproc)
 
 #### NOISE GENERATION
-delta = cube.generate_noise(seed=seed)
+delta = cube.generate_noise(mc=mc)
 times = _profiletime(None, 'noise generation', times, comm, mpiproc)
 
 #### NOISE CONVOLUTION TO OBTAIN DELTA

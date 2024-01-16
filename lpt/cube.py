@@ -3,18 +3,17 @@ import sys
 import os
 import gc
 
-import scaleran as sr
-
 import jax.numpy as jnp 
-import jax.random as rnd
+
 
 class Cube:
     '''Cube'''
-    def __init__(self, **kwargs):
+    def __init__(self, stream, **kwargs):
 
-        self.N       = kwargs.get('N',512)
-        self.Lbox    = kwargs.get('Lbox',7700.0)
-        self.partype = kwargs.get('partype','jaxshard')
+        self.stream         = stream
+        self.N              = kwargs.get('N',512)
+        self.Lbox           = kwargs.get('Lbox',7700.0)
+        self.partype        = kwargs.get('partype','jaxshard')
 
         self.k0 = 2*jnp.pi/self.Lbox
 
@@ -69,20 +68,19 @@ class Cube:
         interp_fcn = jnp.interp(interp_fcn, k_1d, f_1d, left='extrapolate', right='extrapolate')
         return jnp.reshape(interp_fcn, self.cshape_local).astype(jnp.float32)
 
-    def _generate_sharded_noise(self, N, noisetype, seed, nsub):           
+    def _generate_sharded_noise(self, N, noisetype, mc):           
         ngpus   = self.ngpus
         host_id = self.host_id
         start   = self.start
         end     = self.end
 
-        stream = sr.Stream(seed=seed,nsub=nsub)
-        noise = stream.generate(start=start*N**2,size=(end-start)*N**2).astype(jnp.float32)
+        noise = self.stream.generate(start=start*N**2,size=(end-start)*N**2, mc=mc, dist=noisetype)
         noise = jnp.reshape(noise,(end-start,N,N))
         return jnp.transpose(noise,(1,0,2)) 
 
-    def _generate_serial_noise(self, N, noisetype, seed, nsub):
-        stream = sr.Stream(seed=seed,nsub=nsub)
-        noise = stream.generate(start=0,size=N**3).astype(jnp.float32)
+    def _generate_serial_noise(self, N, noisetype, mc):
+        
+        noise = self.stream.generate(start=0,size=N**3, mc=mc, dist=noisetype)
         noise = jnp.reshape(noise,(N,N,N))
         return jnp.transpose(noise,(1,0,2))
 
@@ -140,15 +138,15 @@ class Cube:
                 local_out_subset = out_jit.addressable_data(0)
         return local_out_subset
 
-    def generate_noise(self, noisetype='white', nsub=1024**3, seed=13579):
+    def generate_noise(self, noisetype='normal', mc=0):
 
         N = self.N
 
         noise = None
         if self.partype is None:
-            noise = self._generate_serial_noise(N, noisetype, seed, nsub)
+            noise = self._generate_serial_noise(N, noisetype, mc=mc)
         elif self.partype == 'jaxshard':
-            noise = self._generate_sharded_noise(N, noisetype, seed, nsub)
+            noise = self._generate_sharded_noise(N, noisetype, mc=mc)
         return noise
 
     def noise2delta(self, delta, transfer):
