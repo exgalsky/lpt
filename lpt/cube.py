@@ -3,7 +3,7 @@ import sys
 import os
 import gc
 
-import scaleran as sr
+import xgmutil as mu
 
 import jax.numpy as jnp 
 import jax.random as rnd
@@ -75,13 +75,13 @@ class Cube:
         start   = self.start
         end     = self.end
 
-        stream = sr.Stream(seed=seed,nsub=nsub)
+        stream = mu.Stream(seedkey=seed,nsub=nsub)
         noise = stream.generate(start=start*N**2,size=(end-start)*N**2).astype(jnp.float32)
         noise = jnp.reshape(noise,(end-start,N,N))
         return jnp.transpose(noise,(1,0,2)) 
 
     def _generate_serial_noise(self, N, noisetype, seed, nsub):
-        stream = sr.Stream(seed=seed,nsub=nsub)
+        stream = mu.Stream(seedkey=seed,nsub=nsub)
         noise = stream.generate(start=0,size=N**3).astype(jnp.float32)
         noise = jnp.reshape(noise,(N,N,N))
         return jnp.transpose(noise,(1,0,2))
