@@ -16,7 +16,8 @@ class Cube:
         self.Lbox    = kwargs.get('Lbox',7700.0)
         self.partype = kwargs.get('partype','jaxshard')
 
-        self.k0 = 2*jnp.pi/self.Lbox
+        self.k0  = 2*jnp.pi/self.Lbox
+        self.d3k = self.k0 * self.k0 * self.k0
 
         self.s1lpt = None
         self.s2lpt = None
@@ -151,12 +152,16 @@ class Cube:
             noise = self._generate_sharded_noise(N, noisetype, seed, nsub)
         return noise
 
-    def noise2delta(self, delta, transfer):
-        if not isinstance(transfer, jnp.ndarray):
-            transfer = transfer()
-        
+    def noise2delta(self, delta, power):
+        import numpy as np
+        if not isinstance(power, np.ndarray):
+            power = power()
+        transfer = power
+        transfer[1] = (power[1] * self.d3k)**0.5 # convert from sqrt[P(k)] to T_grid(k) = sqrt[P_grid(k)] = sqrt[P(k)*d3k]
+
         if transfer.ndim != 2 : print('ERROR: Transfer function ndarray is not two dimensional')
         if transfer.shape[1] != 2: print('ERROR: Transfer function ndarray is a two column array. More than two columns supplied.')
+        transfer = jnp.asarray(transfer)
 
         return self._fft(
                     self._apply_grid_transfer_function(self._fft(delta), transfer),
