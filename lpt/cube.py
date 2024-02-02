@@ -16,8 +16,8 @@ class Cube:
         self.Lbox    = kwargs.get('Lbox',7700.0)
         self.partype = kwargs.get('partype','jaxshard')
 
-        self.k0  = 2*jnp.pi/self.Lbox
-        self.d3k = self.k0 * self.k0 * self.k0
+        self.dk  = 2*jnp.pi/self.Lbox
+        self.d3k = self.dk * self.dk * self.dk
 
         self.s1lpt = None
         self.s2lpt = None
@@ -44,9 +44,9 @@ class Cube:
 
     def k_axis(self, r=False, slab_axis=False):
         if r: 
-            k_i = (jnp.fft.rfftfreq(self.N) * self.k0).astype(jnp.float32)
+            k_i = (jnp.fft.rfftfreq(self.N) * self.dk * self.N).astype(jnp.float32)
         else:
-            k_i = (jnp.fft.fftfreq(self.N) * self.k0).astype(jnp.float32)
+            k_i = (jnp.fft.fftfreq(self.N) * self.dk * self.N).astype(jnp.float32)
         if slab_axis: return (k_i[self.start:self.end]).astype(jnp.float32)
         return k_i
     
@@ -88,7 +88,7 @@ class Cube:
         return jnp.transpose(noise,(1,0,2))
 
     def _apply_grid_transfer_function(self, field, transfer_data):
-        transfer_cdm = self.interp2kgrid(transfer_data[:,0], transfer_data[:,1])
+        transfer_cdm = self.interp2kgrid(transfer_data[0], transfer_data[1])
         del transfer_data ; gc.collect()
 
         return field*transfer_cdm
@@ -157,10 +157,10 @@ class Cube:
         if not isinstance(power, np.ndarray):
             power = power()
         transfer = power
-        transfer[1] = (power[1] * self.d3k)**0.5 # convert from sqrt[P(k)] to T_grid(k) = sqrt[P_grid(k)] = sqrt[P(k)*d3k]
-
+        p_whitenoise = (2*np.pi)**3/(self.d3k*self.N**3) # white noise power spectrum
+        transfer[1] = (power[1] / p_whitenoise)**0.5 # transfer(k) = sqrt[P(k)/P_whitenoise]
         if transfer.ndim != 2 : print('ERROR: Transfer function ndarray is not two dimensional')
-        if transfer.shape[1] != 2: print('ERROR: Transfer function ndarray is a two column array. More than two columns supplied.')
+        if transfer.shape[0] != 2: print('ERROR: Transfer function ndarray is a two column array. More than two columns supplied.')
         transfer = jnp.asarray(transfer)
 
         return self._fft(
