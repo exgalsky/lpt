@@ -261,12 +261,13 @@ class Cube:
                   - _get_shear_factor(kx,kz,delta)*_get_shear_factor(kx,kz,delta)
                   - _get_shear_factor(ky,kz,delta)*_get_shear_factor(ky,kz,delta))
 
-        # 2nd order displacements
-        self.s2x = _delta_to_s(kx,delta2)
-        self.s2y = _delta_to_s(ky,delta2)
-        self.s2z = _delta_to_s(kz,delta2)
+        if self.nlpt > 1:
+            # 2nd order displacements
+            self.s2x = _delta_to_s(kx,delta2)
+            self.s2y = _delta_to_s(ky,delta2)
+            self.s2z = _delta_to_s(kz,delta2)
 
-        del delta2; gc.collect()
+            del delta2; gc.collect()
 
         # 1st order displacements
         self.s1x = _delta_to_s(kx,delta)
