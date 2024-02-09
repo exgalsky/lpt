@@ -15,6 +15,7 @@ class Cube:
         self.N       = kwargs.get('N',512)
         self.Lbox    = kwargs.get('Lbox',7700.0)
         self.partype = kwargs.get('partype','jaxshard')
+        self.nlpt    = kwargs.get('nlpt',2)
 
         self.dk  = 2*jnp.pi/self.Lbox
         self.d3k = self.dk * self.dk * self.dk
@@ -169,6 +170,8 @@ class Cube:
 
     def slpt(self, infield='noise', delta=None, mode='lean'):
 
+        if self.nlpt <= 0: return
+
         kx = self.k_axis()
         ky = self.k_axis(slab_axis=True)
         kz = self.k_axis(r=True)
@@ -229,7 +232,7 @@ class Cube:
         #   f = + 3/7 Omegam_m^(-1/143)
         # being a good approximation for a flat universe
 
-        if mode == 'fast':
+        if mode == 'fast' and self.nlpt > 1:
             # minimize operations
             sxx = _get_shear_factor(kx,kx,delta)
             syy = _get_shear_factor(ky,ky,delta)
@@ -248,7 +251,9 @@ class Cube:
             syz = _get_shear_factor(ky,kz,delta)
             delta2 -= syz * syz ; del syz; gc.collect()
 
-        else:
+            delta2 = self._fft(delta2)
+
+        elif self.nlpt > 1:
             # minimize memory footprint
             delta2  = self._fft(
                     _get_shear_factor(kx,kx,delta)*_get_shear_factor(ky,ky,delta)
@@ -258,12 +263,13 @@ class Cube:
                   - _get_shear_factor(kx,kz,delta)*_get_shear_factor(kx,kz,delta)
                   - _get_shear_factor(ky,kz,delta)*_get_shear_factor(ky,kz,delta))
 
-        # 2nd order displacements
-        self.s2x = _delta_to_s(kx,delta2)
-        self.s2y = _delta_to_s(ky,delta2)
-        self.s2z = _delta_to_s(kz,delta2)
+        if self.nlpt > 1:
+            # 2nd order displacements
+            self.s2x = _delta_to_s(kx,delta2)
+            self.s2y = _delta_to_s(ky,delta2)
+            self.s2z = _delta_to_s(kz,delta2)
 
-        del delta2; gc.collect()
+            del delta2; gc.collect()
 
         # 1st order displacements
         self.s1x = _delta_to_s(kx,delta)
