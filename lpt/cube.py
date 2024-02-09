@@ -170,6 +170,8 @@ class Cube:
 
     def slpt(self, infield='noise', delta=None, mode='lean'):
 
+        if self.nlpt <= 0: return
+
         kx = self.k_axis()
         ky = self.k_axis(slab_axis=True)
         kz = self.k_axis(r=True)
