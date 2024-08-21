@@ -2,11 +2,14 @@ import jax
 import sys
 import os
 import gc
+import xgutil.log_util as xglogutil
 
 import xgmutil as mu
 
 import jax.numpy as jnp 
 import jax.random as rnd
+
+from . import multihost_fft as mfft
 
 class Cube:
     '''Cube'''
@@ -36,7 +39,7 @@ class Cube:
         self.host_id = 0
 
         if self.partype == 'jaxshard':
-            self.ngpus   = int(os.environ.get("XGSMENV_NGPUS"))
+            self.ngpus   = jax.device_count()
             self.host_id = jax.process_index()
             self.start   = self.host_id * self.N // self.ngpus
             self.end     = (self.host_id + 1) * self.N // self.ngpus
@@ -94,54 +97,6 @@ class Cube:
 
         return field*transfer_cdm
 
-    def _fft(self,x_np,direction='r2c'):
-        
-        from . import multihost_rfft
-        from jax import jit
-        from jax.experimental import mesh_utils
-        from jax.experimental.multihost_utils import sync_global_devices
-        from jax.sharding import Mesh, PartitionSpec as P, NamedSharding 
-        
-        num_gpus = self.ngpus
-        if direction=='r2c':
-            global_shape = self.rshape
-        else:
-            global_shape = self.cshape
-
-        devices = mesh_utils.create_device_mesh((num_gpus,))
-        mesh = Mesh(devices, axis_names=('gpus',))
-        with mesh:
-            x_single = jax.device_put(x_np).block_until_ready()
-            del x_np ; gc.collect()
-            xshard = jax.make_array_from_single_device_arrays(
-                global_shape,
-                NamedSharding(mesh, P(None, "gpus")),
-                [x_single]).block_until_ready()
-            del x_single ; gc.collect()
-            if direction=='r2c':
-                rfftn_jit = jit(
-                    multihost_rfft.rfftn,
-                    in_shardings=(NamedSharding(mesh, P(None, "gpus"))),
-                    out_shardings=(NamedSharding(mesh, P(None, "gpus")))
-                )
-            else:
-                irfftn_jit = jit(
-                    multihost_rfft.irfftn,
-                    in_shardings=(NamedSharding(mesh, P(None, "gpus"))),
-                    out_shardings=(NamedSharding(mesh, P(None, "gpus")))
-                )
-            sync_global_devices("wait for compiler output")
-
-            with jax.spmd_mode('allow_all'):
-
-                if direction=='r2c':
-                    out_jit: jax.Array = rfftn_jit(xshard).block_until_ready()
-                else:
-                    out_jit: jax.Array = irfftn_jit(xshard).block_until_ready()
-                sync_global_devices("loop")
-                local_out_subset = out_jit.addressable_data(0)
-        return local_out_subset
-
     def generate_noise(self, noisetype='white', nsub=1024**3, seed=13579):
 
         N = self.N
@@ -164,8 +119,8 @@ class Cube:
         if transfer.shape[0] != 2: print('ERROR: Transfer function ndarray is a two column array. More than two columns supplied.')
         transfer = jnp.asarray(transfer)
 
-        return self._fft(
-                    self._apply_grid_transfer_function(self._fft(delta), transfer),
+        return mfft.fft(
+                    self._apply_grid_transfer_function(mfft.fft(delta), transfer),
                     direction='c2r')
 
     def slpt(self, infield='noise', delta=None, mode='lean'):
@@ -194,7 +149,7 @@ class Cube:
             arr = ki*kj/k2*delta
             if self.host_id == 0: 
                 arr = arr.at[index0].set(0.0+0.0j)
-            return self._fft(arr,direction='c2r')
+            return mfft.fft(arr,direction='c2r')
 
         def _delta_to_s(ki,delta):
             # convention:
@@ -204,15 +159,15 @@ class Cube:
             arr = (0+1j)*ki/k2*delta
             if self.host_id == 0: 
                 arr = arr.at[index0].set(0.0+0.0j)
-            arr = self._fft(arr,direction='c2r')
+            arr = mfft.fft(arr,direction='c2r')
             return arr
 
         if infield == 'noise':
             # FT of delta from noise
-            delta = self._apply_grid_transfer_function(self._fft(delta))
+            delta = self._apply_grid_transfer_function(mfft.fft(delta))
         elif infield == 'delta':
             # FT of delta
-            delta = self._fft(delta)
+            delta = mfft.fft(delta)
         else:
             import numpy as np
             # delta from external file
@@ -220,7 +175,7 @@ class Cube:
             delta = jnp.reshape(delta,self.rshape)
             delta = delta[:,self.start:self.end,:]
             # FT of delta
-            delta = self._fft(delta)
+            delta = mfft.fft(delta)
     
         # Definitions used for LPT
         #   grad.S^(n) = - delta^(n)
@@ -251,11 +206,11 @@ class Cube:
             syz = _get_shear_factor(ky,kz,delta)
             delta2 -= syz * syz ; del syz; gc.collect()
 
-            delta2 = self._fft(delta2)
+            delta2 = mfft.fft(delta2)
 
         elif self.nlpt > 1:
             # minimize memory footprint
-            delta2  = self._fft(
+            delta2  = mfft.fft(
                     _get_shear_factor(kx,kx,delta)*_get_shear_factor(ky,ky,delta)
                   + _get_shear_factor(kx,kx,delta)*_get_shear_factor(kz,kz,delta)
                   + _get_shear_factor(ky,ky,delta)*_get_shear_factor(kz,kz,delta)
