@@ -155,7 +155,7 @@ class Cube:
 
     def noise2delta(self, delta, power):
         import numpy as np
-        if not isinstance(power, np.ndarray):
+        if not isinstance(power, (np.ndarray, jnp.ndarray)):
             power = power()
         transfer = power
         p_whitenoise = (2*np.pi)**3/(self.d3k*self.N**3) # white noise power spectrum
