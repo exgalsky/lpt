@@ -2,7 +2,6 @@ import jax
 import sys
 import os
 import gc
-import xgutil.log_util as xglogutil
 
 import xgmutil as mu
 
