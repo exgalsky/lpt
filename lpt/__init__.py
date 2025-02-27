@@ -1,4 +1,4 @@
 from . import cube
-from . import multihost_rfft
+from . import multihost_fft
 from .cube import Cube
 
