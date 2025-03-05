@@ -36,12 +36,15 @@ class Cube:
         self.host_id = 0
 
         if self.partype == 'jaxshard':
+            _JAX_X64_INITIAL_STATE = jax.config.read('jax_enable_x64')
+            jax.config.update("jax_enable_x64", True)
             self.ngpus   = int(os.environ.get("XGSMENV_NGPUS"))
             self.host_id = jax.process_index()
             self.start   = self.host_id * self.N // self.ngpus
             self.end     = (self.host_id + 1) * self.N // self.ngpus
             self.rshape_local = (self.N, self.N // self.ngpus, self.N)
             self.cshape_local = (self.N, self.N // self.ngpus, self.N // 2 + 1)
+            jax.config.update("jax_enable_x64", _JAX_X64_INITIAL_STATE)
 
     def k_axis(self, r=False, slab_axis=False):
         if r: 
